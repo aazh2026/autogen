@@ -278,6 +278,28 @@ async def test_or_termination() -> None:
 
 
 @pytest.mark.asyncio
+async def test_or_termination_raises_terminated_exception() -> None:
+    """OrTerminationCondition must honor the documented contract and raise TerminatedException.
+
+    Every other termination condition raises TerminatedException once it has already
+    been reached. TerminatedException derives from BaseException, so it is not
+    interchangeable with RuntimeError: a caller that follows the documented
+    contract and catches TerminatedException would not catch a RuntimeError.
+    """
+    termination = MaxMessageTermination(1) | TextMentionTermination("stop")
+    assert await termination([TextMessage(content="Hello", source="user")]) is not None
+    assert termination.terminated
+
+    with pytest.raises(TerminatedException):
+        await termination([TextMessage(content="Hello", source="user")])
+
+    # The condition is reusable after a reset, like every other condition.
+    await termination.reset()
+    assert not termination.terminated
+    assert await termination([TextMessage(content="Hello", source="user")]) is not None
+
+
+@pytest.mark.asyncio
 async def test_timeout_termination() -> None:
     termination = TimeoutTermination(0.1)  # 100ms timeout
 
